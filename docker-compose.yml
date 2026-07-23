@@ -1,0 +1,8 @@
+services:
+  kpi:
+    build: .
+    image: kpi-panel
+    ports:
+      # host:container -> open http://localhost:8080 (and http://<LAN-IP>:8080)
+      - "8080:80"
+    restart: unless-stopped

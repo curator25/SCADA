@@ -1,5 +1,5 @@
-import KPIDashboard from "./components/KPIDashboard";
+import KPIPanel from "./components/KPIPanel";
 
 export default function App() {
-  return <KPIDashboard />;
+  return <KPIPanel />;
 }
