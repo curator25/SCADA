@@ -1,16 +1,18 @@
 import React from "react";
+import "./KPIPanel.css";
 
 /* ------------------------------------------------------------------ *
  * KPI Panel  —  matches the UI / colour spec shared by the boss.
  *
- *   Frame ......... 536 (W) x 440 (H), fixed small panel
+ *   Frame ......... fills its container (SCADA frame / browser window)
  *   Background .... #EEEEEE
- *   Row colour .... alternating #E7E7E7 (grey) / #FFFFFF (white)
+ *   Row colour .... alternating #F5F5F5 (grey) / #FFFFFF (white)
  *   Text colour ... #4A4A49
- *   Row height .... 42 px
+ *   Rows .......... grow evenly to fill the panel height
  *
- * The panel is a fixed 536x440 block centered in the window. Opening the
- * link shows only this panel and nothing else.
+ * The panel fills the frame it is placed in (header top, buttons bottom,
+ * rows filling between), so it matches a neighbouring SCADA panel of the
+ * same size with no scrollbar.
  *
  * Values are hard-coded to the reference screenshot for now; they are
  * kept in a single data array so wiring them to the backend later is a
@@ -59,8 +61,6 @@ function TuneIcon() {
 export default function KPIPanel() {
   return (
     <div className="kpi-stage">
-      <style>{CSS}</style>
-
       <div className="kpi-frame">
         {/* -------------------------- header -------------------------- */}
         <header className="kpi-header">
@@ -92,119 +92,3 @@ export default function KPIPanel() {
     </div>
   );
 }
-
-/* ------------------------------- styles ------------------------------- */
-const CSS = `
-.kpi-stage{
-  --bg:#EEEEEE;
-  --row:#E7E7E7;
-  --text:#4A4A49;
-  min-height:100vh;
-  background:#EEEEEE;
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  font-family:"Segoe UI",Tahoma,Geneva,Verdana,Arial,sans-serif;
-  color:var(--text);
-}
-.kpi-stage *{box-sizing:border-box;}
-
-/* fixed small panel — 536 x 440, centered in the window */
-.kpi-frame{
-  width:536px;
-  height:440px;
-  background:var(--bg);
-  border:1px solid #C4C4C4;
-  display:flex;
-  flex-direction:column;
-  overflow:hidden;
-}
-
-/* header */
-.kpi-header{
-  position:relative;
-  height:46px;
-  flex:0 0 46px;
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  background:#F5F5F5;
-  border-bottom:1px solid #DADADA;
-}
-.kpi-header__icon{
-  position:absolute;
-  left:14px;
-  display:inline-flex;
-  color:var(--text);
-}
-.kpi-header__title{
-  font-size:22px;
-  font-weight:600;
-  letter-spacing:.5px;
-  color:var(--text);
-}
-
-/* rows — grow to fill the window, never shorter than 42px */
-.kpi-rows{
-  flex:1 1 auto;
-  display:flex;
-  flex-direction:column;
-}
-.kpi-row{
-  flex:0 0 42px;
-  height:42px;
-  display:grid;
-  grid-template-columns:1fr 1fr;
-  align-items:center;
-  padding:0 4px;
-}
-/* alternate row colours — 1st grey, 2nd white, and so on */
-.kpi-row:nth-child(odd){background:#E7E7E7;}
-.kpi-row:nth-child(even){background:#FFFFFF;}
-.kpi-row__label{
-  padding-left:14px;
-  font-size:14px;
-  color:var(--text);
-  white-space:nowrap;
-  overflow:hidden;
-  text-overflow:ellipsis;
-}
-.kpi-row__value{
-  text-align:center;
-  font-size:14px;
-  color:var(--text);
-}
-
-/* action buttons */
-.kpi-actions{
-  flex:0 0 auto;
-  display:grid;
-  grid-template-columns:1fr 1fr;
-  gap:8px 10px;
-  padding:10px 14px 14px;
-}
-.kpi-btn{
-  height:30px;
-  padding:0 10px;
-  font-size:12.5px;
-  color:var(--text);
-  background:linear-gradient(180deg,#FCFCFC 0%,#E4E4E4 100%);
-  border:1px solid #ADADAD;
-  border-radius:2px;
-  box-shadow:inset 0 1px 0 #FFFFFF;
-  cursor:pointer;
-  white-space:nowrap;
-  transition:background .12s,border-color .12s;
-}
-.kpi-btn:hover{
-  background:linear-gradient(180deg,#FFFFFF 0%,#DCDCDC 100%);
-  border-color:#8C8C8C;
-}
-.kpi-btn:active{
-  background:linear-gradient(180deg,#DCDCDC 0%,#E8E8E8 100%);
-  box-shadow:inset 0 1px 2px rgba(0,0,0,.2);
-}
-/* Trackers button sits in column 1, row 1; column 1 / row 2 stays empty
-   so the two Export buttons stack on the right — matching the mock */
-.kpi-btn--wide{grid-column:1; grid-row:1;}
-`;

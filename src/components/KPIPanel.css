@@ -1,0 +1,110 @@
+.kpi-stage{
+  --bg:#EEEEEE;
+  --row:#E7E7E7;
+  --text:#4A4A49;
+  height:100%;
+  background:#EEEEEE;
+  display:flex;
+  flex-direction:column;
+  font-family:"Segoe UI",Tahoma,Geneva,Verdana,Arial,sans-serif;
+  color:var(--text);
+}
+.kpi-stage *{box-sizing:border-box;}
+
+/* fills its container (the SCADA frame) so it matches the neighbouring panel */
+.kpi-frame{
+  flex:1 1 auto;
+  width:100%;
+  background:var(--bg);
+  border:1px solid #C4C4C4;
+  display:flex;
+  flex-direction:column;
+  overflow:hidden;
+}
+
+/* header */
+.kpi-header{
+  position:relative;
+  height:46px;
+  flex:0 0 46px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  background:#F5F5F5;
+  border-bottom:1px solid #DADADA;
+}
+.kpi-header__icon{
+  position:absolute;
+  left:14px;
+  display:inline-flex;
+  color:var(--text);
+}
+.kpi-header__title{
+  font-size:22px;
+  font-weight:600;
+  letter-spacing:.5px;
+  color:var(--text);
+}
+
+/* rows — grow evenly to fill the panel height */
+.kpi-rows{
+  flex:1 1 auto;
+  display:flex;
+  flex-direction:column;
+}
+.kpi-row{
+  flex:1 1 auto;
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  align-items:center;
+  padding:0 4px;
+}
+/* alternate row colours — 1st grey (matches header), 2nd white */
+.kpi-row:nth-child(odd){background:#F5F5F5;}
+.kpi-row:nth-child(even){background:#FFFFFF;}
+.kpi-row__label{
+  padding-left:14px;
+  font-size:14px;
+  color:var(--text);
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+.kpi-row__value{
+  text-align:center;
+  font-size:14px;
+  color:var(--text);
+}
+
+/* action buttons */
+.kpi-actions{
+  flex:0 0 auto;
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:8px 10px;
+  padding:10px 14px 14px;
+}
+.kpi-btn{
+  height:30px;
+  padding:0 10px;
+  font-size:12.5px;
+  color:var(--text);
+  background:linear-gradient(180deg,#FCFCFC 0%,#E4E4E4 100%);
+  border:1px solid #ADADAD;
+  border-radius:2px;
+  box-shadow:inset 0 1px 0 #FFFFFF;
+  cursor:pointer;
+  white-space:nowrap;
+  transition:background .12s,border-color .12s;
+}
+.kpi-btn:hover{
+  background:linear-gradient(180deg,#FFFFFF 0%,#DCDCDC 100%);
+  border-color:#8C8C8C;
+}
+.kpi-btn:active{
+  background:linear-gradient(180deg,#DCDCDC 0%,#E8E8E8 100%);
+  box-shadow:inset 0 1px 2px rgba(0,0,0,.2);
+}
+/* Trackers button sits in column 1, row 1; column 1 / row 2 stays empty
+   so the two Export buttons stack on the right — matching the mock */
+.kpi-btn--wide{grid-column:1; grid-row:1;}
