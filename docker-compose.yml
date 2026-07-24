@@ -1,8 +1,34 @@
+# Runs the whole KPI system - Python backend + React panel behind nginx.
+#
+#   docker compose up --build -d      start everything
+#   docker compose logs -f            watch the logs
+#   docker compose down               stop everything
+#
+# Open http://localhost:8080 (the panel calls /api/... which nginx forwards
+# to the backend container, so no IP or port is hardcoded in the frontend).
+
 services:
-  kpi:
+  backend:
+    build: ./backend
+    image: kpi-backend
+    ports:
+      - "8000:8000"            # Exposed so you can hit the API directly if needed
+    environment:
+      # Inside a container "localhost" is the container itself, so the database
+      # host must point back at the machine running Docker.
+      KPI_DB_URL: "mysql+pymysql://root:1234@host.docker.internal:3306/scada?charset=utf8mb4"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"   # Needed on Linux; harmless on Windows/Mac
+    volumes:
+      - ./backend/config.json:/app/config.json   # Edit config without rebuilding
+      - ./backend/logs:/app/logs                 # Logs readable from the host
+    restart: unless-stopped
+
+  frontend:
     build: .
     image: kpi-panel
     ports:
-      # host:container -> open http://localhost:8080 (and http://<LAN-IP>:8080)
       - "8080:80"
+    depends_on:
+      - backend
     restart: unless-stopped

@@ -1,0 +1,96 @@
+{
+  "plant": {
+    "name": "Baranna3"
+  },
+
+  "modbus": {
+    "host": "192.168.1.84",
+    "port": 502,
+    "slave_id": 255,
+    "timeout": 1,
+
+    "register_type": "holding",
+    "register_start": 1100,
+    "register_count": 10,
+
+    "word_order": "little",
+    "byte_order": "little",
+
+    "reconnect_delay_seconds": 5
+  },
+
+  "polling": {
+    "read_interval_seconds": 1,
+    "store_interval_seconds": 60
+  },
+
+  "database": {
+    "enabled": true,
+    "url": "mysql+pymysql://root:1234@localhost:3306/scada?charset=utf8mb4",
+    "table": "kpi_readings",
+    "timestamp_column": "Timestamp",
+    "plant_column": "Plant Name",
+    "queue_max_bytes": 10485760
+  },
+
+  "api": {
+    "host": "0.0.0.0",
+    "port": 8000,
+    "cors_origins": ["*"]
+  },
+
+  "timezone": "UTC",
+
+  "parameters": [
+    {
+      "name": "ghi_avg",
+      "label": "GHI Avg",
+      "column": "GHI Avg",
+      "register": 1100,
+      "datatype": "f32",
+      "unit": "W/m²",
+      "scale": 1,
+      "decimals": 3
+    },
+    {
+      "name": "t_env_avg",
+      "label": "T° Enviromental Avg",
+      "column": "T° Enviromental Avg",
+      "register": 1102,
+      "datatype": "f32",
+      "unit": "°C",
+      "scale": 1,
+      "decimals": 3
+    },
+    {
+      "name": "poa_avg",
+      "label": "POA Avg",
+      "column": "POA Avg",
+      "register": 1104,
+      "datatype": "f32",
+      "unit": "W/m²",
+      "scale": 1,
+      "decimals": 3
+    },
+    {
+      "name": "t_module_avg",
+      "label": "T° Module Avg",
+      "column": "T° Module Avg",
+      "register": 1106,
+      "datatype": "f32",
+      "unit": "°C",
+      "scale": 1,
+      "decimals": 3
+    },
+    {
+      "name": "t_mod",
+      "label": "T° Mod",
+      "column": "T° Mod",
+      "register": 1108,
+      "datatype": "f32",
+      "unit": "°C",
+      "scale": 1,
+      "decimals": 3
+    }
+  ]
+}

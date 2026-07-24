@@ -12,6 +12,15 @@ export default defineConfig({
     // one, so the URL you share stays predictable.
     port: 5173,
     strictPort: true,
+    // Forward /api to the Python backend during development, so the panel can
+    // use a relative URL. In Docker, nginx does the same job - which means the
+    // frontend code never needs to know the backend's host or port.
+    proxy: {
+      '/api': {
+        target: process.env.VITE_API_TARGET || 'http://localhost:8000',
+        changeOrigin: true,
+      },
+    },
   },
   preview: {
     host: true,

@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import "./KPIPanel.css";
 
 /* ------------------------------------------------------------------ *
@@ -10,24 +10,18 @@ import "./KPIPanel.css";
  *   Text colour ... #4A4A49
  *   Rows .......... grow evenly to fill the panel height
  *
- * The panel fills the frame it is placed in (header top, buttons bottom,
- * rows filling between), so it matches a neighbouring SCADA panel of the
- * same size with no scrollbar.
+ * Rows are driven entirely by the backend: whatever parameters are listed
+ * in the backend's config.json come back from /api/kpi and are rendered
+ * here. Adding a parameter there makes it appear here with no frontend
+ * change.
  *
- * Values are hard-coded to the reference screenshot for now; they are
- * kept in a single data array so wiring them to the backend later is a
- * one-line change.
+ * The URL is relative on purpose - Vite proxies /api in development and
+ * nginx proxies it in Docker, so this code never needs to know the
+ * backend's host or port.
  * ------------------------------------------------------------------ */
 
-const ROWS = [
-  { label: "GHI Avg", value: "-0.167", unit: "W/m²" },
-  { label: "T° Enviromental Avg", value: "24.600", unit: "°C" },
-  { label: "POA Avg", value: "0.000", unit: "W/m²" },
-  { label: "T° Module Avg", value: "24.713", unit: "°C" },
-  { label: "Daily PR", value: "85.35", unit: "%" },
-  { label: "Plant Availability", value: "0.00", unit: "%" },
-  { label: "Max. Generation Capacity", value: "0.00", unit: "%" },
-];
+const API_URL = "/api/kpi";
+const POLL_MS = 1000;               // Panel refreshes once per second
 
 const ACTIONS = [
   "Trackers Availability Report",
@@ -59,6 +53,38 @@ function TuneIcon() {
 }
 
 export default function KPIPanel() {
+  const [rows, setRows] = useState([]);       // Latest parameters from the backend
+  const [online, setOnline] = useState(false); // Is the backend reachable?
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function load() {
+      try {
+        const response = await fetch(API_URL, { cache: "no-store" });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+        const data = await response.json();
+        if (cancelled) return;
+
+        setRows(data.parameters ?? []);
+        setOnline(true);
+      } catch {
+        // Keep the last known rows so the panel never goes blank - the values
+        // are blanked to '--' below instead.
+        if (!cancelled) setOnline(false);
+      }
+    }
+
+    load();                                   // Fetch immediately on mount
+    const timer = setInterval(load, POLL_MS); // ...then once a second
+
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+    };
+  }, []);
+
   return (
     <div className="kpi-stage">
       <div className="kpi-frame">
@@ -72,14 +98,23 @@ export default function KPIPanel() {
 
         {/* --------------------------- rows --------------------------- */}
         <div className="kpi-rows">
-          {ROWS.map((r) => (
-            <div className="kpi-row" key={r.label}>
-              <span className="kpi-row__label">{r.label}</span>
-              <span className="kpi-row__value">
-                {r.value} {r.unit}
-              </span>
-            </div>
-          ))}
+          {rows.length === 0 ? (
+            <div className="kpi-empty">Connecting…</div>
+          ) : (
+            rows.map((row) => {
+              // Show '--' when the backend is unreachable or the reading is bad,
+              // so a dead sensor is never mistaken for a real 0.00
+              const unavailable = !online || row.quality !== "good";
+              return (
+                <div className="kpi-row" key={row.name}>
+                  <span className="kpi-row__label">{row.label}</span>
+                  <span className="kpi-row__value">
+                    {unavailable ? "--" : `${row.display} ${row.unit}`}
+                  </span>
+                </div>
+              );
+            })
+          )}
         </div>
 
         {/* ------------------------- actions -------------------------- */}

@@ -76,6 +76,17 @@
   color:var(--text);
 }
 
+/* shown before the first successful response from the backend */
+.kpi-empty{
+  flex:1 1 auto;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-size:13px;
+  color:var(--text);
+  background:#F5F5F5;
+}
+
 /* action buttons */
 .kpi-actions{
   flex:0 0 auto;

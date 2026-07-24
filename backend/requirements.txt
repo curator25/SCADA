@@ -1,0 +1,9 @@
+pymodbus==3.8.3
+fastapi>=0.110
+uvicorn[standard]>=0.29
+SQLAlchemy>=2.0
+PyMySQL>=1.1
+psycopg[binary]>=3.1
+watchdog>=4.0
+colorlog>=6.8
+pytz>=2024.1
