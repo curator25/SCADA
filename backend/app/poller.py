@@ -1,18 +1,22 @@
 import time                                              # Monotonic clock for drift-free pacing
 import threading                                         # Runs as a background thread
-from .modbus_client import decode_parameters             # Raw registers -> named values
 
 
 class Poller(threading.Thread):
-    """Reads the Modbus block every `read_interval_seconds` (1s) and updates LatestStore.
+    """Reads the data source every `read_interval_seconds` (1s) and updates LatestStore.
 
     Nothing here writes to the database - persistence is the MinuteWriter's job.
     That separation is what lets the HMI keep updating while the DB is down.
+
+    The source is whatever `build_source_chain` produced: Modbus, a CSV file, a
+    SQL table, or a priority chain that falls back between them. This loop only
+    knows that `read()` returns named values or None - register decoding lives
+    in ModbusSource, where it belongs.
     """
 
-    def __init__(self, reader, store, cfg, logger, stop_event):
+    def __init__(self, source, store, cfg, logger, stop_event):
         super().__init__(name="poller", daemon=True)
-        self.reader = reader
+        self.source = source
         self.store = store
         self.cfg = cfg
         self.logger = logger
@@ -24,27 +28,29 @@ class Poller(threading.Thread):
 
         while not self.stop_event.is_set():
             cycle_start = time.monotonic()
-
-            # Re-read these each cycle so a config hot-reload takes effect immediately
             interval = self.cfg.get("polling", "read_interval_seconds", default=1)
-            register_start = self.cfg.get("modbus", "register_start")
-            word_order = self.cfg.get("modbus", "word_order", default="big")
-            byte_order = self.cfg.get("modbus", "byte_order", default="big")
-            parameters = self.cfg.parameters()
 
-            registers = self.reader.read_block()
+            # An unexpected error must not kill the poller - if this thread dies
+            # the panel silently freezes on its last values with no warning
+            # anywhere, which is worse than a logged failure.
+            try:
+                decoded = self.source.read()
 
-            if registers is None:
+                if decoded is None:
+                    self.store.mark_bad()
+                    if self._was_connected is not False:
+                        self.logger.warning("Source read failed - values marked bad")
+                        self._was_connected = False
+                else:
+                    self.store.update(decoded)
+                    if self._was_connected is not True:
+                        self.logger.info("Source read OK - live values updating")
+                        self._was_connected = True
+
+            except Exception as e:
                 self.store.mark_bad()
-                if self._was_connected is not False:
-                    self.logger.warning("Modbus read failed - values marked bad")
-                    self._was_connected = False
-            else:
-                decoded = decode_parameters(registers, parameters, register_start, word_order, byte_order)
-                self.store.update(decoded)
-                if self._was_connected is not True:
-                    self.logger.info("Modbus read OK - live values updating")
-                    self._was_connected = True
+                self._was_connected = False
+                self.logger.error(f"Poll cycle failed: {e}")
 
             # Sleep only for the time left in this cycle, so reads stay on a steady 1s cadence
             elapsed = time.monotonic() - cycle_start

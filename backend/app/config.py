@@ -13,13 +13,25 @@ from watchdog.events import FileSystemEventHandler   # Base class for file-syste
 _ENV_OVERRIDES = {
     ("database", "url"): "KPI_DB_URL",
     ("database", "enabled"): "KPI_DB_ENABLED",
+    ("database", "mysql", "url"): "KPI_DB_MYSQL_URL",
+    ("database", "postgres", "url"): "KPI_DB_POSTGRES_URL",
     ("modbus", "host"): "KPI_MODBUS_HOST",
     ("modbus", "port"): "KPI_MODBUS_PORT",
     ("modbus", "slave_id"): "KPI_MODBUS_SLAVE_ID",
+    ("modbus", "enabled"): "KPI_MODBUS_ENABLED",
+    # Source selection, so a container can be pointed at a different input
+    # without editing the bind-mounted config file.
+    ("file_source", "enabled"): "KPI_FILE_SOURCE_ENABLED",
+    ("file_source", "path"): "KPI_FILE_SOURCE_PATH",
+    ("mysql_source", "enabled"): "KPI_MYSQL_SOURCE_ENABLED",
+    ("mysql_source", "url"): "KPI_MYSQL_SOURCE_URL",
+    ("postgres_source", "enabled"): "KPI_POSTGRES_SOURCE_ENABLED",
+    ("postgres_source", "url"): "KPI_POSTGRES_SOURCE_URL",
     ("api", "host"): "KPI_API_HOST",
     ("api", "port"): "KPI_API_PORT",
     ("plant", "name"): "KPI_PLANT_NAME",
     ("timezone",): "KPI_TIMEZONE",
+    ("reports", "timezone"): "KPI_REPORTS_TIMEZONE",
 }
 
 # Function to Turn an environment string into bool/int/float where that makes sense.

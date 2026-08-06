@@ -3,7 +3,14 @@
     "name": "Baranna3"
   },
 
+  "sources": {
+    "failback_check_seconds": 60
+  },
+
   "modbus": {
+    "enabled": true,
+    "priority": 1,
+
     "host": "192.168.1.84",
     "port": 502,
     "slave_id": 255,
@@ -11,12 +18,43 @@
 
     "register_type": "holding",
     "register_start": 1100,
-    "register_count": 10,
+    "register_count": 12,
 
     "word_order": "little",
     "byte_order": "little",
 
     "reconnect_delay_seconds": 5
+  },
+
+  "file_source": {
+    "enabled": false,
+    "priority": 2,
+    "path": "C:/plantdata/live.csv",
+    "delimiter": ",",
+    "encoding": "utf-8-sig",
+    "match_by": "column",
+    "timestamp_column": "Timestamp",
+    "max_age_seconds": 300
+  },
+
+  "mysql_source": {
+    "enabled": false,
+    "priority": 3,
+    "url": "mysql+pymysql://user:password@host:3306/plant?charset=utf8mb4",
+    "table": "plant_live",
+    "match_by": "column",
+    "timestamp_column": "Timestamp",
+    "max_age_seconds": 300
+  },
+
+  "postgres_source": {
+    "enabled": false,
+    "priority": 4,
+    "url": "postgresql+psycopg://user:password@host:5432/plant",
+    "table": "plant_live",
+    "match_by": "column",
+    "timestamp_column": "Timestamp",
+    "max_age_seconds": 300
   },
 
   "polling": {
@@ -26,7 +64,18 @@
 
   "database": {
     "enabled": true,
+
     "url": "mysql+pymysql://root:1234@localhost:3306/scada?charset=utf8mb4",
+
+    "mysql": {
+      "enabled": true,
+      "url": "mysql+pymysql://root:1234@localhost:3306/scada?charset=utf8mb4"
+    },
+    "postgres": {
+      "enabled": false,
+      "url": "postgresql+psycopg://postgres:1234@localhost:5432/scada"
+    },
+
     "table": "kpi_readings",
     "timestamp_column": "Timestamp",
     "plant_column": "Plant Name",
@@ -40,6 +89,56 @@
   },
 
   "timezone": "UTC",
+
+  "reports": {
+    "timezone": "Asia/Kolkata"
+  },
+
+  "kpi": {
+    "enabled": true,
+    "table": "kpi_metrics",
+
+    "interval_minutes": 5,
+    "compute_delay_seconds": 10,
+    "min_samples": 3,
+    "backfill_on_start": true,
+
+    "energy_mode": "interval_total",
+
+    "month_timezone": "UTC",
+
+    "metrics": [
+      {
+        "name": "pr",
+        "label": "Performance Ratio",
+        "column": "PR",
+        "unit": "%",
+        "decimals": 2
+      }
+    ],
+
+    "pr": {
+      "label": "Performance Ratio",
+      "decimals": 2,
+
+      "p_stc_kwp": 23395,
+      "temp_coefficient": -0.29,
+      "irradiance_threshold": 50,
+      "irradiance_ref": 1000,
+      "pr_max_valid": 100,
+
+      "irradiance_param": "poa_avg",
+      "module_temp_param": "t_mod",
+      "energy_param": "energy_05min",
+
+      "poa_max": 2000,
+      "tmod_min": -40,
+      "tmod_max": 120,
+      "energy_max_factor": 1.5,
+
+      "tmod_monthly": [37, 40, 45, 50, 54, 52, 47, 46, 47, 45, 41, 38]
+    }
+  },
 
   "parameters": [
     {
@@ -90,7 +189,19 @@
       "datatype": "f32",
       "unit": "°C",
       "scale": 1,
-      "decimals": 3
+      "decimals": 3,
+      "display": false
+    },
+    {
+      "name": "energy_05min",
+      "label": "Energy 5Min",
+      "column": "Energy",
+      "register": 1110,
+      "datatype": "f32",
+      "unit": "MWh",
+      "scale": 1,
+      "decimals": 4,
+      "display": false
     }
   ]
 }

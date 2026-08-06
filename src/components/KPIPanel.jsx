@@ -29,6 +29,24 @@ const ACTIONS = [
   "Export Daily PR Report",
 ];
 
+/* Report endpoints. Relative like /api/kpi, so the same proxy handles them. */
+const REPORT_5MIN = "/api/reports/pr-5min";
+const REPORT_DAILY = "/api/reports/pr-daily";
+
+/* Trigger a CSV download.
+ *
+ * The backend sends Content-Disposition: attachment, so pointing the browser
+ * at the URL downloads the file instead of navigating away from the panel -
+ * which matters here, because the panel is embedded in the SCADA frame. */
+function downloadReport(url) {
+  const link = document.createElement("a");
+  link.href = url;
+  link.rel = "noopener";
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+}
+
 /* settings / tune icon shown at the top-left of the header */
 function TuneIcon() {
   return (
@@ -52,8 +70,17 @@ function TuneIcon() {
   );
 }
 
+/* "2026-07-28T17:45:00" -> "17:45", used to show when a held PR was computed */
+function clockTime(iso) {
+  if (!iso) return null;
+  const at = new Date(iso);
+  if (Number.isNaN(at.getTime())) return null;
+  return at.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+}
+
 export default function KPIPanel() {
   const [rows, setRows] = useState([]);       // Latest parameters from the backend
+  const [kpis, setKpis] = useState([]);       // Computed KPIs (Performance Ratio)
   const [online, setOnline] = useState(false); // Is the backend reachable?
 
   useEffect(() => {
@@ -68,6 +95,7 @@ export default function KPIPanel() {
         if (cancelled) return;
 
         setRows(data.parameters ?? []);
+        setKpis(data.kpis ?? []);
         setOnline(true);
       } catch {
         // Keep the last known rows so the panel never goes blank - the values
@@ -101,27 +129,60 @@ export default function KPIPanel() {
           {rows.length === 0 ? (
             <div className="kpi-empty">Connecting…</div>
           ) : (
-            rows.map((row) => {
-              // Show '--' when the backend is unreachable or the reading is bad,
-              // so a dead sensor is never mistaken for a real 0.00
-              const unavailable = !online || row.quality !== "good";
-              return (
-                <div className="kpi-row" key={row.name}>
-                  <span className="kpi-row__label">{row.label}</span>
-                  <span className="kpi-row__value">
-                    {unavailable ? "--" : `${row.display} ${row.unit}`}
-                  </span>
-                </div>
-              );
-            })
+            <>
+              {rows.map((row) => {
+                // Show '--' when the backend is unreachable or the reading is bad,
+                // so a dead sensor is never mistaken for a real 0.00
+                const unavailable = !online || row.quality !== "good";
+                return (
+                  <div className="kpi-row" key={row.name}>
+                    <span className="kpi-row__label">{row.label}</span>
+                    <span className="kpi-row__value">
+                      {unavailable ? "--" : `${row.display} ${row.unit}`}
+                    </span>
+                  </div>
+                );
+              })}
+
+              {/* Computed KPIs. Unlike the live rows above, a KPI keeps its
+                  last value when the current interval produces nothing (night,
+                  or a data gap) - `stale` marks it as held rather than current,
+                  and the timestamp shows when it was actually calculated. */}
+              {kpis.map((kpi, index) => {
+                const unavailable = kpi.value === null || kpi.value === undefined;
+                const at = kpi.stale ? clockTime(kpi.computed_at) : null;
+                return (
+                  <div
+                    className={`kpi-row${index === 0 ? " kpi-row--divider" : ""}`}
+                    key={kpi.name}
+                  >
+                    <span className="kpi-row__label">{kpi.label}</span>
+                    <span className="kpi-row__value">
+                      {unavailable ? "--" : `${kpi.display} ${kpi.unit}`}
+                      {at && <span className="kpi-row__stale"> · {at}</span>}
+                    </span>
+                  </div>
+                );
+              })}
+            </>
           )}
         </div>
 
         {/* ------------------------- actions -------------------------- */}
         <div className="kpi-actions">
           <button className="kpi-btn kpi-btn--wide">{ACTIONS[0]}</button>
-          <button className="kpi-btn">{ACTIONS[1]}</button>
-          <button className="kpi-btn">{ACTIONS[2]}</button>
+          <button
+            className="kpi-btn"
+            onClick={() => downloadReport(REPORT_5MIN)}
+          >
+            {ACTIONS[1]}
+          </button>
+          <button
+            className="kpi-btn"
+            onClick={() => downloadReport(REPORT_DAILY)}
+          >
+            {ACTIONS[2]}
+          </button>
         </div>
       </div>
     </div>

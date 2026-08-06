@@ -1,3 +1,9 @@
+# Python build artefacts - regenerated on every run, never worth committing
+__pycache__/
+*.py[cod]
+.venv
+venv
+
 # Logs
 logs
 *.log
