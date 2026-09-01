@@ -32,6 +32,9 @@ STATUS_NO_ENERGY = "no_energy"
 STATUS_OVER_RANGE = "over_range"             # The SEL guard fired
 STATUS_IMPLAUSIBLE = "implausible_input"     # Reading is outside physical limits
 
+# How the energy register should be read - see PRCalculator._energy
+ENERGY_MODES = ("interval_sum", "interval_total", "cumulative")
+
 
 def validate_kpi_config(cfg, logger):
     """Check the KPI settings once at startup and report what is wrong.
@@ -64,6 +67,12 @@ def validate_kpi_config(cfg, logger):
     if len(monthly) != 12 or not all(isinstance(v, (int, float)) for v in monthly):
         problems.append(
             f"kpi.pr.tmod_monthly must hold 12 numbers (Jan-Dec), got {len(monthly)}"
+        )
+
+    mode = cfg.get("kpi", "energy_mode", default="interval_total")
+    if mode not in ENERGY_MODES:
+        problems.append(
+            f"kpi.energy_mode is '{mode}' - must be one of {', '.join(ENERGY_MODES)}"
         )
 
     reference = pr_cfg.get("irradiance_ref", 1000)
@@ -266,7 +275,19 @@ class PRCalculator(threading.Thread):
             return None, STATUS_BAD_INPUT, details
 
         # ---- actual energy for this interval ----
-        energy_mwh = self._energy(energy_values)
+        anchor = None
+        energy_mode = self.cfg.get("kpi", "energy_mode", default="interval_total")
+        if energy_mode == "cumulative":
+            anchor = self._energy_anchor(window_start, plant, energy_col, interval)
+            details["meter_start"] = anchor
+            if anchor is None:
+                self.logger.warning(
+                    "KPI: no meter reading at the start of the interval - "
+                    "cumulative energy needs the previous boundary, so this "
+                    "interval is skipped (normal for the first one after a start)"
+                )
+
+        energy_mwh = self._energy(energy_values, anchor, interval)
         if energy_mwh is None:
             return None, STATUS_NO_ENERGY, details
 
@@ -302,18 +323,61 @@ class PRCalculator(threading.Thread):
 
         return pr, STATUS_OK, details
 
-    def _energy(self, energy_values):
-        """Energy generated during the interval, in MWh."""
+    def _energy_anchor(self, window_start, plant, energy_col, interval):
+        """Meter reading AT the interval's start boundary, for cumulative mode.
+
+        Looks back up to one interval, so a single missing minute row does not
+        void the calculation.
+        """
+        rows = self._rows_for_window(
+            window_start - timedelta(minutes=interval), window_start, plant
+        )
+        values = self._column_values(rows, energy_col)
+        return values[-1] if values else None
+
+    def _energy(self, energy_values, anchor=None, interval=5):
+        """Energy generated during the interval, in MWh.
+
+        Three shapes of source register are supported, because plants differ:
+
+          interval_sum    the register reports the energy of each MINUTE, so
+                          the interval total is those samples added up
+          interval_total  the register already holds the interval's total, so
+                          the value at the boundary is taken as-is
+          cumulative      a lifetime meter, so the interval's energy is the
+                          rise from the reading at the start boundary
+        """
         if not energy_values:
             return None
 
         mode = self.cfg.get("kpi", "energy_mode", default="interval_total")
 
-        if mode == "cumulative":
-            # Lifetime meter: the interval's energy is the rise across the window
-            if len(energy_values) < 2:
+        if mode == "interval_sum":
+            # Scaling the mean by the interval equals a plain sum when every
+            # minute is present, but does not silently under-report when one
+            # is missing - a 3-of-5 window would otherwise return 60% of the
+            # real energy and drag PR down with no visible cause.
+            per_minute = self._mean(energy_values)
+            if per_minute is None:
                 return None
-            delta = energy_values[-1] - energy_values[0]
+            if len(energy_values) < interval:
+                self.logger.warning(
+                    f"KPI: only {len(energy_values)} of {interval} energy samples "
+                    f"in this interval - total estimated from the average minute"
+                )
+            return per_minute * interval
+
+        if mode == "cumulative":
+            # A lifetime meter only reveals the interval's energy by difference,
+            # and the subtraction has to start from the reading at the START
+            # boundary - not the first reading inside the window.
+            #
+            # The window for 09:05 holds 09:01..09:05, so differencing within it
+            # spans four minutes, not five: PR would come out ~20% low, and
+            # plausibly enough that nobody would question it.
+            if anchor is None:
+                return None
+            delta = energy_values[-1] - anchor
             return delta if delta >= 0 else None     # Negative = meter rollover/reset
 
         # interval_total: the register already holds this interval's energy, so

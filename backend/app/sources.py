@@ -3,7 +3,7 @@ import io                                          # Parse single CSV lines
 import csv                                         # Delimited file parsing
 import time                                        # Monotonic clock for failback timing
 import threading                                   # The chain is read from the poller thread
-from datetime import datetime, timedelta           # Staleness checks
+from datetime import datetime                      # Staleness checks
 
 from sqlalchemy import create_engine, MetaData, Table, select
 

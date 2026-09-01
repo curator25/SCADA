@@ -176,10 +176,30 @@ class ModbusReader:
                 if not self.connect():
                     return None
 
-            start = self.cfg.get("modbus", "register_start")
             count = self.cfg.get("modbus", "register_count")
             slave = self.cfg.get("modbus", "slave_id", default=1)
             reg_type = str(self.cfg.get("modbus", "register_type", default="holding")).lower()
+
+            # Vendors document holding registers two different ways:
+            #
+            #   raw / protocol   0, 1, 2 ...        -> address_base 0
+            #   4x reference     40001, 40002 ...   -> address_base 40001
+            #
+            # The wire protocol only ever carries the raw address, so a device
+            # documented as "40500" is actually address 499. Getting this wrong
+            # is the classic Modbus off-by-one: the read either fails outright
+            # or silently returns a completely different block. Keeping it as
+            # one config value means the registers can be written exactly as the
+            # vendor documents them, and the convention flipped in one place.
+            base = self.cfg.get("modbus", "address_base", default=0) or 0
+            start = self.cfg.get("modbus", "register_start") - base
+
+            if start < 0:
+                self._log_failure(
+                    f"register_start {start + base} is below address_base {base} - "
+                    f"check modbus.address_base (0 for raw addresses, 40001 for 4x)"
+                )
+                return None
 
             # pymodbus renamed the unit argument across versions:
             #   <= 3.8  -> slave=      >= 3.9  -> device_id=
