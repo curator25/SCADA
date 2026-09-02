@@ -2,6 +2,7 @@ import os            # KPI_DB_URL must keep overriding everything, as in Phase 1
 
 from sqlalchemy import (create_engine, MetaData, Table, Column, DateTime, String, Float,
                         insert, select, inspect, text,)
+from sqlalchemy.engine import make_url
 from sqlalchemy.exc import IntegrityError
 
 READINGS = "readings"   # kpi_readings - one wide row per minute
@@ -125,6 +126,84 @@ class Database:
                 conn.execute(text(ddl))
                 self.logger.warning(f"Added missing column '{column.name}' to '{table.name}'")
 
+    def _ensure_database(self, url):
+        """Create the target database when the server is up but the schema is not.
+
+        Called only after a connection attempt has already failed, so a normal
+        start never opens a server-level connection and never needs CREATE
+        privileges. Returns True when the database exists afterwards.
+        """
+        try:
+            target = make_url(url)
+        except Exception:
+            return False
+
+        name = target.database
+        backend = target.get_backend_name()
+
+        # sqlite and friends have no server-side database to create - the file
+        # appears on its own - so there is nothing to do for them.
+        if not name or backend not in ("mysql", "postgresql"):
+            return False
+
+        # Connect to the server without touching the missing database. MySQL
+        # lets every user into information_schema; PostgreSQL refuses a
+        # connection with no database at all, so use its maintenance database.
+        candidates = ["information_schema"] if backend == "mysql" else ["postgres", "template1"]
+
+        server = conn = last_error = None
+        for candidate in candidates:
+            engine = create_engine(
+                target.set(database=candidate),
+                # CREATE DATABASE cannot run inside a transaction on
+                # PostgreSQL, so no implicit one may be opened.
+                isolation_level="AUTOCOMMIT",
+                future=True,
+            )
+            try:
+                conn = engine.connect()
+                server = engine
+                break
+            except Exception as e:
+                engine.dispose()
+                last_error = e
+
+        if conn is None:
+            # The server itself is unreachable, or the credentials are wrong.
+            # The caller's own error already says so, more accurately than a
+            # message about creating a database would.
+            self.logger.debug(f"Cannot reach the server to create '{name}': {last_error}")
+            return False
+
+        try:
+            with conn:
+                quoted = server.dialect.identifier_preparer.quote(name)
+                if backend == "mysql":
+                    conn.execute(text(
+                        f"CREATE DATABASE IF NOT EXISTS {quoted} CHARACTER SET utf8mb4"
+                    ))
+                else:
+                    # PostgreSQL has no IF NOT EXISTS for CREATE DATABASE, so
+                    # the check is a separate query.
+                    exists = conn.execute(
+                        text("SELECT 1 FROM pg_database WHERE datname = :n"), {"n": name}
+                    ).scalar()
+                    if not exists:
+                        conn.execute(text(f"CREATE DATABASE {quoted}"))
+
+            self.logger.warning(f"Database '{name}' did not exist - created it")
+            return True
+
+        except Exception as e:
+            # Reached the server but the user may not hold CREATE rights. This
+            # one is worth an error: it is actionable, and it is not what the
+            # caller's message will say.
+            self.logger.error(f"Could not create database '{name}': {e}")
+            return False
+
+        finally:
+            server.dispose()
+
     def _resolve_url(self):
         """(url, where it came from) for the storage destination.
 
@@ -153,6 +232,21 @@ class Database:
         # pool_pre_ping lets SQLAlchemy detect dropped connections and reconnect
         try:
             self.engine = create_engine(url, pool_pre_ping=True, future=True)
+
+            # A fresh machine has the database server running but nothing
+            # inside it. Probe before building the tables: if connecting fails
+            # only because the database is missing, create it and carry on, so
+            # a first run needs no manual SQL. Any other failure - server down,
+            # wrong credentials - is re-raised untouched and still reports
+            # itself accurately below.
+            try:
+                with self.engine.connect():
+                    pass
+            except Exception:
+                if not self._ensure_database(url):
+                    raise
+                self.engine.dispose()
+                self.engine = create_engine(url, pool_pre_ping=True, future=True)
 
             metadata = MetaData()
             self.tables = {
